@@ -1,17 +1,15 @@
 name: Supabase Heartbeat
 on:
   schedule:
-    # Tous les 5 jours à 10h (ajustable)
-    - cron: '0 10 */5 * *'
-  workflow_dispatch:  # Permet de lancer manuellement
+    - cron: '0 12 */3 * *'
+  workflow_dispatch:
 
 jobs:
-  ping-supabase:
+  ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase API
+      - name: Ping Supabase
         run: |
-          curl -s -o /dev/null -w "Status: %{http_code}\n" \
-          -X GET '${{ secrets.SUPABASE_URL }}/rest/v1/' \
-          -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-          -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
+          curl -X GET "https://lanxxvocjwpyegoxxxkj.supabase.co/rest/v1/" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
