@@ -1,24 +1,69 @@
-name: Supabase Heartbeat Actif
+name: Supabase Dashboard Visit
 on:
   schedule:
-    # S'exécute tous les 3 jours à 10h00 UTC (ajustez si besoin)
-    - cron: '0 10 */3 * *'
-  workflow_dispatch: # Permet de lancer manuellement
+    # Tous les 4 jours à 9h (fréquence suffisante)
+    - cron: '0 9 */4 * *'
+  workflow_dispatch:
 
 jobs:
-  ping-db:
+  visit-dashboard:
     runs-on: ubuntu-latest
     steps:
-      - name: Exécuter une requête SQL sur une table existante
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Create visit script
         run: |
-          echo "Requête sur la table 'w_articles'..."
-          # Cette requête sélectionne 1 ligne de la table w_articles.
-          curl -s -o /dev/null -w "Statut de la requête: %{http_code}\n" \
-            -X GET "$SUPABASE_URL/rest/v1/w_articles?select=id&limit=1" \
-            -H "apikey: $SUPABASE_ANON_KEY" \
-            -H "Authorization: Bearer $SUPABASE_ANON_KEY"
-          
-          echo "✅ Heartbeat actif exécuté avec succès."
+          cat > visit.js << 'EOF'
+          const { chromium } = require('playwright');
+
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const page = await browser.newPage();
+
+            console.log('Connexion à Supabase...');
+            await page.goto('https://supabase.com/dashboard/sign-in');
+            
+            // Remplir le formulaire de connexion
+            await page.fill('input[name="email"]', process.env.SUPABASE_EMAIL);
+            await page.fill('input[name="password"]', process.env.SUPABASE_PASSWORD);
+            await page.click('button[type="submit"]');
+            
+            // Attendre la redirection (important)
+            await page.waitForURL('**/dashboard/projects', { timeout: 10000 });
+            console.log('Connecté avec succès.');
+            
+            // Aller sur la page du projet spécifique
+            console.log('Navigation vers le projet...');
+            await page.goto(`https://supabase.com/dashboard/project/${process.env.SUPABASE_PROJECT_REF}`);
+            await page.waitForLoadState('networkidle');
+            
+            // Aller sur la page "Table Editor" pour générer une activité
+            console.log('Visite du Table Editor...');
+            await page.goto(`https://supabase.com/dashboard/project/${process.env.SUPABASE_PROJECT_REF}/editor`);
+            await page.waitForLoadState('networkidle');
+            
+            // Optionnel : Aller sur une autre page pour plus d'activité
+            console.log('Visite de la page Database...');
+            await page.goto(`https://supabase.com/dashboard/project/${process.env.SUPABASE_PROJECT_REF}/database/tables`);
+            await page.waitForTimeout(3000); // Pause de 3 secondes
+
+            console.log('Session de navigation terminée avec succès.');
+            await browser.close();
+          })();
+          EOF
+
+      - name: Run Playwright visit
+        env:
+          SUPABASE_EMAIL: ${{ secrets.SUPABASE_EMAIL }}
+          SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: node visit.js
