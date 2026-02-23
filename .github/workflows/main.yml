@@ -1,15 +1,24 @@
-name: Supabase Heartbeat
+name: Supabase Heartbeat Actif
 on:
   schedule:
-    - cron: '0 12 */3 * *'
-  workflow_dispatch:
+    # S'exécute tous les 3 jours à 10h00 UTC (ajustez si besoin)
+    - cron: '0 10 */3 * *'
+  workflow_dispatch: # Permet de lancer manuellement
 
 jobs:
-  ping:
+  ping-db:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase
+      - name: Exécuter une requête SQL sur une table existante
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          curl -X GET "https://lanxxvocjwpyegoxxxkj.supabase.co/rest/v1/" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
+          echo "Requête sur la table 'w_articles'..."
+          # Cette requête sélectionne 1 ligne de la table w_articles.
+          curl -s -o /dev/null -w "Statut de la requête: %{http_code}\n" \
+            -X GET "$SUPABASE_URL/rest/v1/w_articles?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY"
+          
+          echo "✅ Heartbeat actif exécuté avec succès."
