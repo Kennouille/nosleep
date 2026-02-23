@@ -1,55 +1,47 @@
-name: Supabase Dashboard Visit
+name: Supabase User Action
 on:
   schedule:
-    - cron: '0 9 */4 * *'
+    - cron: '0 8 */3 * *'
   workflow_dispatch:
 
 jobs:
-  visit-dashboard:
+  simulate-user:
     runs-on: ubuntu-latest
     steps:
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Installer Playwright correctement
+      - name: Installer dépendances
         run: |
           npm init -y
-          npm install playwright
-          npx playwright install chromium
+          npm install @supabase/supabase-js
 
-      - name: Créer et exécuter le script de visite
+      - name: Simuler un utilisateur et une action
         env:
-          SUPABASE_EMAIL: ${{ secrets.SUPABASE_EMAIL }}
-          SUPABASE_PASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           node -e "
-          const { chromium } = require('playwright');
+          const { createClient } = require('@supabase/supabase-js');
+          const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
           
           (async () => {
-            const browser = await chromium.launch();
-            const page = await browser.newPage();
+            // Lire des données (action)
+            const { data, error } = await supabase
+              .from('w_articles')
+              .select('*')
+              .limit(5);
             
-            console.log('Connexion...');
-            await page.goto('https://supabase.com/dashboard/sign-in');
-            await page.waitForTimeout(2000);
+            if (error) throw error;
+            console.log(\`✅ Lecture de \${data.length} articles\`);
             
-            await page.fill('input[name=\"email\"]', process.env.SUPABASE_EMAIL);
-            await page.fill('input[name=\"password\"]', process.env.SUPABASE_PASSWORD);
-            await page.click('button[type=\"submit\"]');
+            // Lire une autre table pour plus d'activité
+            const { data: projets, error: error2 } = await supabase
+              .from('w_projets')
+              .select('*')
+              .limit(5);
             
-            await page.waitForTimeout(5000);
+            if (!error2) {
+              console.log(\`✅ Lecture de \${projets.length} projets\`);
+            }
             
-            console.log('Visite du projet...');
-            await page.goto(\`https://supabase.com/dashboard/project/\${process.env.SUPABASE_PROJECT_REF}/editor\`);
-            await page.waitForTimeout(3000);
-            
-            console.log('✅ Visite terminée');
-            await browser.close();
-          })().catch(err => {
-            console.error('Erreur:', err);
-            process.exit(1);
-          });
+            console.log('✅ Session utilisateur avec actions terminée');
+          })().catch(console.error);
           "
